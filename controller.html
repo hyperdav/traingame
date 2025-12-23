@@ -99,7 +99,7 @@
 
     .distance {
       font-size: 1.8rem;
-      margin-top: 10px;
+      margin-top: 100px;
       text-align: center;
     }
 
@@ -160,7 +160,7 @@
           </div>
         </div>
       </div>
-      <div class="distance">Distance: <span id="distance">0.0</span> miles</div>
+      <div class="distance">Distance: <br><span id="distance">0.0</span>/100</div>
     </div>
 
     <!-- Controls -->
@@ -236,6 +236,8 @@
 
       if (pressure < 0) pressure = 0;
 
+      speed = Math.max(0,speed); // dont go below 0;
+
       // Update distance
       distance += speed * 0.02;
       if (distance > maxDistance) distance = maxDistance;
@@ -286,8 +288,8 @@
 
     function playHorn() {
       hornSound.play().catch(err => console.log("Horn blocked:", err));
-      pressure = pressure -= .09;
-      throttle -= .15;
+      pressure = Math.max(0, pressure -.09);
+      throttle  = Math.max(0, throttle - .15);
     }
     document.getElementById("hornBtn").addEventListener("touchstart", playHorn);
     document.getElementById("hornBtn").addEventListener("mousedown", playHorn);
