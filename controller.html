@@ -27,11 +27,11 @@
       text-shadow: 0 0 10px #aa7f00;
     }
 
-    .section {
+    .main-section {
       display: flex;
       justify-content: center;
+      align-items: flex-start;
       gap: 40px;
-      flex-wrap: wrap;
       margin-top: 20px;
       width: 90%;
     }
@@ -39,8 +39,8 @@
     /* Gauge container */
     .gauge-container {
       position: relative;
-      width: 120px;
-      height: 120px;
+      width: 140px;
+      height: 140px;
     }
 
     /* Pressure gauge with red danger zone */
@@ -97,24 +97,11 @@
       text-align: center;
     }
 
-    /* Panels */
-    .panel {
-      border: 3px solid #aa7f00;
-      border-radius: 15px;
-      padding: 15px;
-      background: linear-gradient(#222, #000);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 15px;
-      box-shadow: 0 0 20px rgba(170, 127, 0, 0.5);
-    }
-
+    /* Controls */
     .controls {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 20px;
-      justify-content: center;
     }
 
     button {
@@ -150,10 +137,10 @@
 
   <h1>🚂 Steam Train Game</h1>
 
-  <div class="section">
-    <div class="panel">
-      <h2>Gauges</h2>
-      <div style="display:flex; gap:30px;">
+  <div class="main-section">
+    <!-- Gauges -->
+    <div>
+      <div style="display:flex; gap:20px;">
         <div class="gauge-container">
           <div class="gauge pressure">
             <div class="needle" id="pressureNeedle"></div>
@@ -169,27 +156,13 @@
       </div>
       <div class="distance">Distance: <span id="distance">0.0</span> miles</div>
     </div>
-  </div>
 
-  <div class="section">
-    <div class="panel">
-      <h2>Throttle</h2>
-      <div class="controls">
-        <button id="throttleUp">Throttle ↑</button>
-        <button id="throttleDown">Throttle ↓</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Safety & Horn</h2>
-      <div class="controls">
-        <button class="emergency" id="emergencyStop">EMERGENCY STOP</button>
-        <button class="horn" id="hornBtn">HORN</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Start Train</h2>
+    <!-- Controls -->
+    <div class="controls">
+      <button id="throttleUp">Throttle ↑</button>
+      <button id="throttleDown">Throttle ↓</button>
+      <button class="emergency" id="emergencyStop">EMERGENCY STOP</button>
+      <button class="horn" id="hornBtn">HORN</button>
       <button class="start" id="startTrain">Start Train</button>
     </div>
   </div>
@@ -214,7 +187,7 @@
     const maxDistance = 10.0;
     const accelerationRate = 0.005;
     const decelerationRate = 0.003;
-    const pressureBuildRate = 0.003;  // increased from 0.001
+    const pressureBuildRate = 0.003;  // faster build
 
     function sendThrottle() {
       if (socket.readyState === WebSocket.OPEN) {
@@ -223,14 +196,13 @@
     }
 
     function updateGauges() {
-      pressureNeedle.style.transform = `rotate(${pressure * 270}deg)`; // 0-270 safe rotation
+      pressureNeedle.style.transform = `rotate(${pressure * 270}deg)`;
       speedNeedle.style.transform = `rotate(${speed * 270}deg)`;
     }
 
     function gameLoop() {
       if (gameOver) return;
 
-      // smooth throttle
       if (currentSpeed < throttle) {
         currentSpeed += accelerationRate;
         if (currentSpeed > throttle) currentSpeed = throttle;
@@ -241,19 +213,16 @@
 
       speed = currentSpeed;
 
-      // pressure build / decay
       pressure += pressureBuildRate * speed;
       if (throttle === 0) pressure -= 0.001;
       if (pressure < 0) pressure = 0;
 
-      // distance
       distance += speed * 0.02;
       if (distance > maxDistance) distance = maxDistance;
       distanceDisplay.textContent = distance.toFixed(1);
 
       updateGauges();
 
-      // game over
       if (pressure >= maxPressure) {
         alert("🚨 BOOM! Steam overpressure! Game Over!");
         gameOver = true;
@@ -262,7 +231,6 @@
         if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'pause' }));
       }
 
-      // win
       if (distance >= maxDistance) {
         alert("🎉 You Win! Train reached 10 miles!");
         gameOver = true;
@@ -274,7 +242,6 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // controls
     function increaseThrottle() { throttle = Math.min(1, throttle + 0.1); }
     function decreaseThrottle() { throttle = Math.max(0, throttle - 0.1); }
 
