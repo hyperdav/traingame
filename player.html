@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TV Player</title>
+<style>
+  body, html { margin:0; padding:0; height:100%; background:black; overflow:hidden; }
+  video { width:100%; height:100%; object-fit:contain; }
+</style>
+</head>
+<body>
+
+<video id="video" src="TrainRide.mp4" playsinline></video>
+
+<script>
+const video = document.getElementById("video");
+const socket = new WebSocket("ws://" + location.host);
+
+// default playback rate
+let targetRate = 1.0;
+
+socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if(msg.type === 'pause') video.pause();
+    else if(msg.type === 'throttle') {
+        // throttle 0–1 maps to playbackRate 0.5–2
+        targetRate = 0.5 + msg.value * 1.5;
+        video.playbackRate = targetRate;
+        if(video.paused && msg.value > 0) video.play();
+    }
+    else if(msg.type === 'restart') {
+        video.currentTime = 0;
+        video.play();
+    }
+};
+</script>
+
+</body>
+</html>

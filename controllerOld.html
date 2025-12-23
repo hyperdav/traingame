@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Steam Locomotive Controls</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Workshop Lock">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-startup-image" href="splash.png">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            background: radial-gradient(circle at top, #222, #111);
+            color: #ffd700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            padding-top: 20px;
+            user-select: none;
+            touch-action: none;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #aa7f00;
+        }
+
+        .panel {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        button {
+            font-size: 1.5rem;
+            padding: 25px;
+            border-radius: 12px;
+            border: 3px solid #aa7f00;
+            background: linear-gradient(#ffd700, #aa7f00);
+            color: black;
+            box-shadow: inset 0 0 8px #000, 0 4px #444;
+            touch-action: manipulation;
+            transition: box-shadow 0.2s, transform 0.1s;
+        }
+
+        button.flash {
+            box-shadow: 0 0 20px #ffd700, inset 0 0 12px #000;
+            transform: translateY(2px);
+        }
+
+        button:active {
+            box-shadow: inset 0 0 12px #000;
+            transform: translateY(4px);
+        }
+
+        .brake {
+            background: linear-gradient(#ff6f00, #aa3f00);
+        }
+
+        .emergency {
+            grid-column: span 2;
+            background: radial-gradient(circle, red, darkred);
+            color: #fff;
+            font-size: 1.8rem;
+        }
+
+        .lever-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lever {
+            width: 50px;
+            height: 150px;
+            background: #444;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .knob {
+            width: 60px;
+            height: 30px;
+            background: #aa7f00;
+            position: absolute;
+            top: 0;
+            left: -5px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: top 0.2s;
+        }
+
+        .gauge {
+            width: 80px;
+            height: 80px;
+            background: #111;
+            border: 4px solid #aa7f00;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: inset 0 0 10px #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .needle {
+            width: 2px;
+            height: 35px;
+            background: red;
+            position: absolute;
+            bottom: 50%;
+            transform-origin: bottom;
+            transform: rotate(0deg);
+            transition: transform 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🚂 Steam Locomotive Controls</h1>
+
+    <div class="panel">
+        <button id="startBtn">🚦 START ENGINE</button>
+        <div>
+            <button id="fasterBtn">UP</button><br>
+            <button id="slowerBtn">DN</button>
+        </div>
+        <!-- <button class="brake" id="brakeBtn">🛑 BRAKE</button> -->
+        <!-- <button id="resetBtn">🔁 REVERSE / RESET</button> -->
+        <!-- <button id="stationBtn">⏭ NEXT STATION</button> -->
+        <button class="emergency" id="emergencyBtn">🚨 EMERGENCY STOP</button>
+    </div>
+
+    <div style="display:flex; gap:40px; margin-top:30px;">
+        <div class="lever-container">
+            <div>Throttle</div>
+            <div class="lever" id="throttleLever">
+                <div class="knob" id="throttleKnob"></div>
+            </div>
+        </div>
+        <div class="lever-container">
+            <div>Brake</div>
+            <div class="lever" id="brakeLever">
+                <div class="knob" id="brakeKnob"></div>
+            </div>
+        </div>
+        <div class="lever-container">
+            <div>Steam Pressure</div>
+            <div class="gauge">
+                <div class="needle" id="pressureNeedle"></div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="clickSound" src="click.mp3"></audio>
+
+    <script>
+        const socket = new WebSocket("ws://" + location.host);
+
+        // Flash button feedback
+        function flashButton(btn) {
+            btn.classList.add('flash');
+            document.getElementById('clickSound').play();
+            setTimeout(() => btn.classList.remove('flash'), 200);
+        }
+
+        // Buttons send commands
+        document.getElementById('startBtn').onclick = () => { flashButton(startBtn); socket.send(JSON.stringify({ type: 'restart' })); };
+        // document.getElementById('brakeBtn').onclick = () => { flashButton(brakeBtn); socket.send(JSON.stringify({ type: 'pause' })); };
+        // document.getElementById('resetBtn').onclick = () => { flashButton(resetBtn); socket.send(JSON.stringify({ type: 'play' })); };
+        // document.getElementById('stationBtn').onclick = () => { flashButton(stationBtn); socket.send(JSON.stringify({ type: 'seek', time: 15 })); };
+        document.getElementById('emergencyBtn').onclick = () => { flashButton(emergencyBtn); socket.send(JSON.stringify({ type: 'pause' })); };
+
+        // Lever function (proportional + snap-back)
+        function setupLever(leverId, knobId, callback) {
+            const lever = document.getElementById(leverId);
+            const knob = document.getElementById(knobId);
+            let dragging = false;
+
+            lever.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+            lever.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+            knob.addEventListener('pointerdown', e => { dragging = true; e.target.setPointerCapture(e.pointerId); e.preventDefault(); });
+            knob.addEventListener('pointermove', e => {
+                if (!dragging) return;
+                const rect = lever.getBoundingClientRect();
+                let y = e.clientY - rect.top - knob.offsetHeight / 2;
+                y = Math.max(0, Math.min(rect.height - knob.offsetHeight, y));
+                knob.style.top = y + 'px';
+                let ratio = 1 - (y / (rect.height - knob.offsetHeight));
+                callback(ratio);
+                e.preventDefault();
+            });
+            knob.addEventListener('pointerup', e => { dragging = false; knob.style.top = '0px'; callback(0); });
+            knob.addEventListener('pointerleave', e => dragging = false);
+        }
+
+        // Map levers
+        setupLever('throttleLever', 'throttleKnob', ratio => {
+            socket.send(JSON.stringify({ type: 'throttle', value: ratio }));
+        });
+
+        setupLever('brakeLever', 'brakeKnob', ratio => {
+            socket.send(JSON.stringify({ type: 'brake', value: ratio }));
+        });
+
+        // Animate gauge
+        socket.addEventListener('message', msg => {
+            const data = JSON.parse(msg.data);
+            const needle = document.getElementById('pressureNeedle');
+            if (data.type === 'playing') needle.style.transform = 'rotate(90deg)';
+            else needle.style.transform = 'rotate(0deg)';
+        });
+    </script>
+
+</body>
+
+</html>
