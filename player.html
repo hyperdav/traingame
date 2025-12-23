@@ -25,8 +25,9 @@ socket.onmessage = (event) => {
     if(msg.type === 'pause') video.pause();
     else if(msg.type === 'throttle') {
         // throttle 0–1 maps to playbackRate 0.5–2
-        targetRate = 0.5 + msg.value * 3.5;
+        targetRate = 0.1 + msg.value *1.9;
         video.playbackRate = targetRate;
+        console.log(targetRate);
         if(video.paused && msg.value > 0) video.play();
     }
     else if(msg.type === 'restart') {
