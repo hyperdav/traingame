@@ -54,6 +54,7 @@
       width: 100%;
       height: 100%;
       border-radius: 50%;
+      border: 2px solid #888;
       background: conic-gradient(#222 0deg 270deg, #ff000082 270deg 360deg);
       display: flex;
       justify-content: center;
@@ -61,18 +62,6 @@
       position: relative;
       transition: box-shadow 0.2s;
     }
-
-    /* .gauge.speed {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: #222;
-      border: 2px solid #888;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-    } */
 
     .gauge.speed {
       width: 100%;
@@ -87,47 +76,23 @@
       overflow: visible;
     }
 
-    /* 
-    .gauge.speed {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: conic-gradient(#222 0deg,
-          #222 162deg,
-
-          #1aff00 162deg,
-          #1aff00 189deg,
-
-          #222 189deg,
-          #222 360deg);
-      border: 2px solid #888;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-    } */
-
+    /* Outer green safe zone */
     .gauge.speed::after {
       content: "";
       position: absolute;
       inset: -8px;
-      /* controls distance from gauge */
       border-radius: 50%;
       background: conic-gradient(transparent 0deg,
-          transparent 162deg,
-
-          #1aff00 162deg,
-          #1aff00 189deg,
-
-          transparent 189deg,
+          transparent var(--safe-min-deg, 162deg),
+          #1aff00 var(--safe-min-deg, 162deg),
+          #1aff00 var(--safe-max-deg, 189deg),
+          transparent var(--safe-max-deg, 189deg),
           transparent 360deg);
-      mask: radial-gradient(circle,
-          transparent 65%,
-          black 65%);
+      mask: radial-gradient(circle, transparent 65%, black 50%);
       pointer-events: none;
-      box-shadow: 0 0 8px #1aff00;
     }
 
+    /* Inner throttle indicator */
     .gauge.speed::before {
       content: "";
       position: absolute;
@@ -135,19 +100,22 @@
       border-radius: 50%;
       background: conic-gradient(transparent 0deg,
           transparent var(--throttle-deg-start, 0deg),
-          #dae417 var(--throttle-deg-start, 0deg),
-          #dae417 var(--throttle-deg-end, 0deg),
+          #1aff00 var(--throttle-deg-start, 0deg),
+          #1aff00 var(--throttle-deg-end, 0deg),
           transparent var(--throttle-deg-end, 0deg),
           transparent 360deg);
       mask: radial-gradient(circle, transparent 50%, black 65%);
       pointer-events: none;
       z-index: 2;
-      box-shadow: 0 0 4px #dae417;
+      box-shadow: 0 0 6px #1aff00;
+      /* opacity: 0; */
+      transition: opacity 0.4s ease-in-out;
     }
 
+    /* Pulse animation */
     @keyframes pulseArc {
       0% {
-        box-shadow: 0 0 4px #eeff00;
+        box-shadow: 0 0 4px #1aff00;
       }
 
       50% {
@@ -375,6 +343,58 @@
     const pressureBuildRateDefault = 0.00075;
     const throttleChange = 0.075;
 
+    // Adjustable safe green zone (throttle 0–1)
+    //sweet spot
+    let safeMinThrottle = 0.55;
+    let safeMaxThrottle = 0.75;
+
+    function updateSafeZoneCSS() {
+      const speedGauge = document.querySelector(".gauge.speed");
+
+      const safeMinDeg = safeMinThrottle * 270;
+      const safeMaxDeg = safeMaxThrottle * 270;
+
+      speedGauge.style.setProperty('--safe-min-deg', safeMinDeg + 'deg');
+      speedGauge.style.setProperty('--safe-max-deg', safeMaxDeg + 'deg');
+    }
+
+    // Call once at start
+    updateSafeZoneCSS();
+
+    // Update inner throttle indicator
+    function updateThrottleIndicator() {
+      const speedGauge = document.querySelector(".gauge.speed");
+      const deg = throttle * 270;
+
+      const startDeg = deg - 5;
+      const endDeg = deg + 5;
+
+      speedGauge.style.setProperty('--throttle-deg-start', startDeg + 'deg');
+      speedGauge.style.setProperty('--throttle-deg-end', endDeg + 'deg');
+
+      const safeMinDeg = safeMinThrottle * 270;
+      const safeMaxDeg = safeMaxThrottle * 270;
+
+      // Always visible
+      // speedGauge.style.setProperty('opacity', '1');
+
+      // Only pulse in the safe zone
+      if (deg >= safeMinDeg && deg <= safeMaxDeg) {
+        speedGauge.style.setProperty('animation', 'pulseArc 1s infinite');
+      } else {
+        speedGauge.style.setProperty('animation', 'none');
+      }
+    }
+
+
+    // Call in your game loop along with updateGauges
+    function updateGauges() {
+      pressureNeedle.style.transform = `rotate(${pressure * 270}deg)`;
+      speedNeedle.style.transform = `rotate(${speed * 270}deg)`;
+
+      updateThrottleIndicator();
+    }
+
     document.getElementById("maxDistanceDisplay").innerText = maxDistance;
 
     const overlay = document.getElementById("overlay");
@@ -407,27 +427,6 @@
       }
     }
 
-    function updateThrottleIndicator() {
-      const speedGauge = document.querySelector(".gauge.speed");
-
-      const deg = throttle * 270;
-      const startDeg = deg - 5;
-      const endDeg = deg + 5;
-
-      speedGauge.style.setProperty('--throttle-deg-start', startDeg + 'deg');
-      speedGauge.style.setProperty('--throttle-deg-end', endDeg + 'deg');
-
-      // Determine if throttle is in green outer sweet spot
-      const safeMin = 0.6 * 270;
-      const safeMax = 0.7 * 270;
-
-      if (deg >= safeMin && deg <= safeMax) {
-        speedGauge.querySelector('::before'); // pseudo-element cannot be queried directly
-        speedGauge.style.setProperty('animation', 'pulseArc 1s infinite');
-      } else {
-        speedGauge.style.setProperty('animation', 'none');
-      }
-    }
 
     function updateGauges() {
       pressureNeedle.style.transform = `rotate(${pressure * 270}deg)`;
@@ -459,18 +458,19 @@
       }
 
       // safe thotttle zone
-      if (throttle > .6 && throttle < .7) {
-        pressureBuildRate = pressureBuildRateDefault / 4;
+      if (speed > safeMinThrottle && speed < safeMaxThrottle) {
+        let variation = Math.random() * .0004;
+        pressureBuildRate = (pressureBuildRateDefault / 4) - variation;
       } else {
         pressureBuildRate = pressureBuildRateDefault;
       }
 
       pressure += pressureBuildRate * speed;
 
-      if (throttle < .75) pressure -= 0.00015;
-      if (throttle < .5) pressure -= 0.0005;
-      if (throttle < .25) pressure -= 0.001;
-      if (throttle < .2) pressure -= 0.01;
+      // if (throttle < .75) pressure -= 0.00015;
+      // if (throttle < .5) pressure -= 0.0005;
+      // if (throttle < .25) pressure -= 0.001;
+      // if (throttle < .2) pressure -= 0.01;
       pressure = Math.max(0, pressure);
 
       distance += speed * 0.02;
