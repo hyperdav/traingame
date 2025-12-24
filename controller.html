@@ -5,6 +5,14 @@
   <meta charset="UTF-8">
   <title>Steam Train Controller</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TRAIN">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-startup-image" href="splash.png">
+
   <style>
     body,
     html {
@@ -132,6 +140,70 @@
       background: green;
       color: white;
     }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .overlay-box {
+      background: #111;
+      border: 3px solid #aa7f00;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 0 25px #000;
+      max-width: 90%;
+    }
+
+    .overlay-box button {
+      margin-top: 20px;
+    }
+
+    .glowText {
+      color: #fff;
+      /* The color of the main text */
+      text-align: center;
+      /* Apply the animation name, duration, timing, iteration count, and direction */
+      animation: glowText .4s ease-in-out infinite alternate;
+    }
+
+    @keyframes glowText {
+
+      /* 'from' is 0% of the animation time */
+      from {
+        /* Stack multiple text-shadows for a fuller glow: x-offset, y-offset, blur-radius, color */
+        text-shadow: 0 0 10px #fff,
+          /* Inner white glow */
+          0 0 20px #fff,
+          0 0 30px #463fd3,
+          /* Outer pink/magenta glow */
+          0 0 40px #463fd3,
+          0 0 50px #463fd3,
+          0 0 60px #463fd3,
+          0 0 70px #463fd3;
+      }
+
+      /* 'to' is 100% of the animation time */
+      to {
+        /* Change the blur-radius and potentially color to create the pulsing effect */
+        text-shadow: 0 0 20px #fff,
+          0 0 30px #43c1e0,
+          0 0 40px #43c1e0,
+          0 0 50px #43c1e0,
+          0 0 60px #43c1e0,
+          0 0 70px #43c1e0,
+          0 0 80px #43c1e0;
+      }
+    }
   </style>
 </head>
 
@@ -170,9 +242,17 @@
     </div>
   </div>
 
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div id="overlayText"></div>
+      <button id="overlayBtn">OK</button>
+    </div>
+  </div>
+
   <audio id="hornSound" src="horn.mp3"></audio>
   <audio id="steamSound" src="steam.mp3"></audio>
   <audio id="brakeSound" src="brake.mp3"></audio>
+  <audio id="explodeSound" src="explode.mp3"></audio>
 
   <script>
     const socket = new WebSocket("ws://" + location.host);
@@ -181,6 +261,7 @@
     const speedNeedle = document.getElementById("speedNeedle");
     const distanceDisplay = document.getElementById("distance");
     const hornSound = document.getElementById("hornSound");
+    const explodeSound = document.getElementById("explodeSound");
     const steamSound = document.getElementById("steamSound");
     const brakeSound = document.getElementById("brakeSound");
     const pressureGauge = document.querySelector(".gauge.pressure");
@@ -198,12 +279,36 @@
     let endTime = null;
 
     const maxPressure = 1.0;
-    const maxDistance = 100.0;
+    const maxDistance = 50.0;
     const accelerationRate = 0.003;
     const decelerationRate = 0.005;
     const pressureBuildRate = 0.00075;
 
     document.getElementById("maxDistanceDisplay").innerText = maxDistance;
+
+    const overlay = document.getElementById("overlay");
+    const overlayText = document.getElementById("overlayText");
+    const overlayBtn = document.getElementById("overlayBtn");
+
+    function showOverlay(message, onClose, closeParams = null) {
+      overlayText.innerHTML = message.replace(/\n/g, "<br>");
+      overlay.classList.remove("hidden");
+
+       let closeOverlayButtonHandler = function (event) {
+        // Check if the pressed key is the 'Enter' key
+        if (event.key === 'Enter' || event.key === "Return") {
+          overlayBtn.click();
+        }
+      };
+
+      document.addEventListener('keydown', closeOverlayButtonHandler);
+
+      overlayBtn.onclick = () => {
+        overlay.classList.add("hidden");
+        document.removeEventListener('keydown', closeOverlayButtonHandler);
+        if (onClose) onClose(closeParams);
+      };
+    }
 
     function sendThrottle() {
       if (socket.readyState === WebSocket.OPEN) {
@@ -251,16 +356,16 @@
       updateGauges();
 
       if (pressure >= maxPressure) {
-        alert("💥 Steam overpressure! You died.");
-        resetGame();
+        explodeSound.play().catch(() => { });
+        showOverlay("💥 Steam overpressure! You died.", resetGame);
         return;
       }
 
       if (distance >= maxDistance && gameState === "running") {
         gameState = "finished";
-        //throttle = 0;
+
         sendThrottle();
-        alert("🚉 Destination reached!\nSlow down to stop safely.");
+        showOverlay("🚉 Destination reached!\nSlow down to stop safely.");
       }
 
       sendThrottle();
@@ -268,21 +373,54 @@
     }
 
     function resetGame() {
-      gameOver = true;
-      gameState = "idle";
-      throttle = 0;
-      pressure = 0;
-      distance = 0;
-      startTime = null;
-      endTime = null;
+      window.location.reload();
 
-      sendThrottle();
-      socket.send(JSON.stringify({ type: 'pause' }));
 
-      setTimeout(() => {
-        gameOver = false;
-        requestAnimationFrame(gameLoop);
-      }, 500);
+      // gameOver = true;
+      // gameState = "idle";
+      // throttle = 0;
+      // pressure = 0;
+      // distance = 0;
+      // startTime = null;
+      // endTime = null;
+
+      // sendThrottle();
+      // socket.send(JSON.stringify({ type: 'pause' }));
+
+      // setTimeout(() => {
+      //   gameOver = false;
+      //   requestAnimationFrame(gameLoop);
+      // }, 500);
+    }
+
+    function showHighScoresThenResetGame(time) {
+      showHighScores(time, resetGame)
+    }
+
+    function showHighScores(currentTime = null, resetGameOption = null) {
+      const scores = JSON.parse(localStorage.getItem("trainHighScores") || "[]");
+
+      let html = `<h2>🏆 High Scores</h2>`;
+
+      if (currentTime !== null) {
+        html += `<p>Your Time: <strong>${currentTime.toFixed(2)}s</strong></p>`;
+      }
+
+      if (scores.length === 0) {
+        html += `<p>No scores yet</p>`;
+      } else {
+        html += `<ol style="text-align:left; display:inline-block;">`;
+        scores.forEach((s, i) => {
+          if (s == currentTime) {
+            html += `<li class='glowText'>${s.toFixed(2)}s</li>`;
+          } else {
+            html += `<li>${s.toFixed(2)}s</li>`;
+          }
+        });
+        html += `</ol>`;
+      }
+
+      showOverlay(html, resetGameOption);
     }
 
     function saveHighScore(time) {
@@ -291,8 +429,9 @@
       scores.sort((a, b) => a - b);
       scores = scores.slice(0, 10);
       localStorage.setItem("trainHighScores", JSON.stringify(scores));
-      console.log("🏆 High Scores:", scores);
+      return scores;
     }
+
 
     document.getElementById("throttleUp").onclick = () => throttle = Math.min(1, throttle + 0.1);
     document.getElementById("throttleDown").onclick = () => throttle = Math.max(0, throttle - 0.1);
@@ -317,16 +456,14 @@
     document.getElementById("stopTrain").onclick = () => {
       brakeSound.play().catch(() => { });
       if (speed > 0.25) {
-        alert("💀 Stopped too fast! You died.");
-        resetGame();
+        showOverlay("💀 Stopped too fast! You died.", resetGame);
         return;
       }
       if (gameState === "finished") {
         endTime = performance.now();
-        const time = ((endTime - startTime) / 1000).toFixed(2);
+        const time = ((endTime - startTime) / 1000);
         saveHighScore(parseFloat(time));
-        alert(`🏆 Perfect stop!\nTime: ${time}s`);
-        resetGame();
+        showOverlay(`🏆 Perfect stop!\nTime: ${time.toFixed(2)}s`, showHighScoresThenResetGame, time);
         return;
       }
     }
