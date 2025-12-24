@@ -54,11 +54,11 @@
                 // throttle 0–1 maps to playbackRate 0.5–2
                 targetRate = 0.1 + msg.value * 1.9;
                 video.playbackRate = targetRate;
+                video.play();
                 if (video.paused && msg.value > 0) video.play();
             }
             else if (msg.type === 'restart') {
                 video.currentTime = 0;
-                video.play();
             }
         };
     </script>

@@ -62,6 +62,18 @@
       transition: box-shadow 0.2s;
     }
 
+    /* .gauge.speed {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #222;
+      border: 2px solid #888;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    } */
+
     .gauge.speed {
       width: 100%;
       height: 100%;
@@ -72,7 +84,65 @@
       justify-content: center;
       align-items: center;
       position: relative;
+      overflow: visible;
     }
+
+    /* 
+    .gauge.speed {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: conic-gradient(#222 0deg,
+          #222 162deg,
+
+          #1aff00 162deg,
+          #1aff00 189deg,
+
+          #222 189deg,
+          #222 360deg);
+      border: 2px solid #888;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    } */
+
+    .gauge.speed::after {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      /* controls distance from gauge */
+      border-radius: 50%;
+      background: conic-gradient(transparent 0deg,
+          transparent 162deg,
+
+          #1aff00 162deg,
+          #1aff00 189deg,
+
+          transparent 189deg,
+          transparent 360deg);
+      mask: radial-gradient(circle,
+          transparent 65%,
+          black 65%);
+      pointer-events: none;
+      box-shadow: 0 0 8px #1aff00;
+    }
+
+    .gauge.speed::before {
+      content: "";
+      position: absolute;
+      inset: 0px;
+      border-radius: 52%;
+      background: conic-gradient(transparent 0deg, transparent var(--throttle-deg-start, 0deg),
+          #9bac3b var(--throttle-deg-start, 0deg),
+          #ead843 var(--throttle-deg-end, 0deg),
+          transparent var(--throttle-deg-end, 0deg),
+          transparent 360deg);
+      mask: radial-gradient(circle, transparent 65%, black 50%);
+      pointer-events: none;
+      z-index: 2
+    }
+
 
     .gauge.pressure.warn {
       box-shadow: 0 0 15px orange;
@@ -249,7 +319,8 @@
     </div>
   </div>
 
-  <audio id="hornSound" src="horn.mp3"></audio>
+  <audio id="horn2Sound" src="horn2.mp3"></audio>
+  <audio id="horn3Sound" src="horn3.mp3"></audio>
   <audio id="steamSound" src="steam.mp3"></audio>
   <audio id="brakeSound" src="brake.mp3"></audio>
   <audio id="explodeSound" src="explode.mp3"></audio>
@@ -260,11 +331,14 @@
     const pressureNeedle = document.getElementById("pressureNeedle");
     const speedNeedle = document.getElementById("speedNeedle");
     const distanceDisplay = document.getElementById("distance");
-    const hornSound = document.getElementById("hornSound");
+    const horn2Sound = document.getElementById("horn2Sound");
+    const horn3Sound = document.getElementById("horn3Sound");
     const explodeSound = document.getElementById("explodeSound");
     const steamSound = document.getElementById("steamSound");
     const brakeSound = document.getElementById("brakeSound");
     const pressureGauge = document.querySelector(".gauge.pressure");
+
+    const hornSounds = [horn2Sound, horn3Sound];
 
     let throttle = 0;
     let currentSpeed = 0;
@@ -282,7 +356,7 @@
     const maxDistance = 50.0;
     const accelerationRate = 0.003;
     const decelerationRate = 0.005;
-    const pressureBuildRate = 0.00075;
+    const pressureBuildRateDefault = 0.00075;
 
     document.getElementById("maxDistanceDisplay").innerText = maxDistance;
 
@@ -294,7 +368,7 @@
       overlayText.innerHTML = message.replace(/\n/g, "<br>");
       overlay.classList.remove("hidden");
 
-       let closeOverlayButtonHandler = function (event) {
+      let closeOverlayButtonHandler = function (event) {
         // Check if the pressed key is the 'Enter' key
         if (event.key === 'Enter' || event.key === "Return") {
           overlayBtn.click();
@@ -316,12 +390,28 @@
       }
     }
 
+    function updateThrottleIndicator() {
+      const speedGauge = document.querySelector(".gauge.speed");
+
+      // Map throttle (0–1) to 270° sweep
+      const deg = throttle * 270;
+
+      // We'll make it a small arc, e.g., 10° wide
+      const startDeg = deg - 5;  // half-width before
+      const endDeg = deg + 5;    // half-width after
+
+      speedGauge.style.setProperty('--throttle-deg-start', startDeg + 'deg');
+      speedGauge.style.setProperty('--throttle-deg-end', endDeg + 'deg');
+    }
+
     function updateGauges() {
       pressureNeedle.style.transform = `rotate(${pressure * 270}deg)`;
       speedNeedle.style.transform = `rotate(${speed * 270}deg)`;
 
       pressureGauge.classList.toggle("warn", pressure > 0.7 && pressure <= 0.85);
       pressureGauge.classList.toggle("danger", pressure > 0.85);
+
+      updateThrottleIndicator();
     }
 
     function gameLoop() {
@@ -335,6 +425,7 @@
         if (currentSpeed < throttle) currentSpeed = throttle;
       }
 
+
       speed = Math.max(0, currentSpeed);
 
       if (speed > 0 && !startTime) {
@@ -342,7 +433,15 @@
         gameState = "running";
       }
 
+      // safe thotttle zone
+      if (throttle > .6 && throttle < .7) {
+        pressureBuildRate = pressureBuildRateDefault / 4;
+      } else {
+        pressureBuildRate = pressureBuildRateDefault;
+      }
+
       pressure += pressureBuildRate * speed;
+
       if (throttle < .75) pressure -= 0.00015;
       if (throttle < .5) pressure -= 0.0005;
       if (throttle < .25) pressure -= 0.001;
@@ -369,6 +468,12 @@
       }
 
       sendThrottle();
+
+      if (speed === 0 && throttle === 0 && gameState === "running") {
+        socket.send(JSON.stringify({ type: 'pause' }));
+      }
+
+
       requestAnimationFrame(gameLoop);
     }
 
@@ -437,13 +542,27 @@
     document.getElementById("throttleDown").onclick = () => throttle = Math.max(0, throttle - 0.1);
 
     document.getElementById("hornBtn").onclick = () => {
-      hornSound.play().catch(() => { });
-      pressure = Math.max(0, pressure - 0.075);
-      throttle = Math.max(0, throttle - 0.03);
+
+      // cant press too fast
+      // check if horn is playing
+      var playing = false;
+      for (let index = 0; index < hornSounds.length; index++) {
+        if (!(hornSounds[index]).paused) {
+          playing = true;
+          break;
+        }
+      }
+
+      if (!playing) {
+        var horn = Math.random() * 2;
+        hornSounds[(Math.trunc(horn))].play();
+        pressure = Math.max(0, pressure - 0.075);
+        throttle = Math.max(0, throttle - 0.03);
+      }
     };
 
     document.getElementById("startTrain").onclick = () => {
-      socket.send(JSON.stringify({ type: 'restart' }));
+      socket.send(JSON.stringify({ type: 'seek' }));
     };
 
     document.getElementById("brakeTrain").onclick = () => {
@@ -455,6 +574,7 @@
 
     document.getElementById("stopTrain").onclick = () => {
       brakeSound.play().catch(() => { });
+      socket.send(JSON.stringify({ type: 'pause' }));
       if (speed > 0.25) {
         showOverlay("💀 Stopped too fast! You died.", resetGame);
         return;
